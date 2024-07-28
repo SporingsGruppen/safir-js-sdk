@@ -10,5 +10,8 @@
     "name": "Robin Louis van Komen",
     "email": "rlvk@sporingsgruppen.dk"
   },
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
 }
