@@ -1,5 +1,5 @@
 {
-  "name": "@sg/safir-js-sdk",
+  "name": "@sporings-gruppen/safir-js-sdk",
   "version": "1.0.1",
   "description": "A JavaScript SDK for interacting with the SAFIR product",
   "main": "./dist/index.js",
