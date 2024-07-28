@@ -1,0 +1,14 @@
+{
+  "name": "@sg/safir-js-sdk",
+  "version": "1.0.0",
+  "description": "A JavaScript SDK for interacting with the SAFIR product",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": {
+    "name": "Robin Louis van Komen",
+    "email": "rlvk@sporingsgruppen.dk"
+  },
+  "license": "ISC"
+}
