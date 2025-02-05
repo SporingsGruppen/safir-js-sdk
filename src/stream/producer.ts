@@ -1,13 +1,6 @@
 import { PutRecordsCommand, PutRecordsCommandInput } from "@aws-sdk/client-kinesis";
 import { KinesisClient } from "./kinesis";
-import { StreamTelemetryPacket } from "./types";
-
-interface StreamProducerConfig {
-    // The number of retries on error (default: 3)
-    maxRetries?: number;
-    // Set the size of maximum packets to write in a single request (default: 500)
-    batchSize?: number;
-}
+import { StreamProducerConfig, StreamTelemetryPacket } from "./types";
 
 export class StreamProducer {
     private readonly client: KinesisClient;
