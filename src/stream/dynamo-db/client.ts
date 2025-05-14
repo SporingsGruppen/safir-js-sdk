@@ -26,7 +26,7 @@ export class DynamoDBClient {
     /**
      * Retrieves lease information for a specific shard
      */
-    async getLease(shardId: string): Promise<ShardLease | undefined> {
+    public async getLease(shardId: string): Promise<ShardLease | undefined> {
         const command = new GetCommand({
             TableName: this.tableName,
             Key: { shardId }
@@ -42,7 +42,7 @@ export class DynamoDBClient {
      * Uses a conditional update to ensure only one instance can own the lease.
      * It will succeed if the lease doesn't exist or if the existing lease has expired.
      */
-    async tryAcquireLease(shardId: string, instanceId: string): Promise<boolean> {
+    public async tryAcquireLease(shardId: string, instanceId: string): Promise<boolean> {
         try {
             const now = Date.now();
             const command = new UpdateCommand({
@@ -74,7 +74,7 @@ export class DynamoDBClient {
      * The checkpoint represents the last successfully processed record position.
      * The update will fail if this instance no longer owns the lease.
      */
-    async updateCheckpoint(shardId: string, sequenceNumber: string, instanceId: string): Promise<boolean> {
+    public async updateCheckpoint(shardId: string, sequenceNumber: string, instanceId: string): Promise<boolean> {
         try {
             const command = new UpdateCommand({
                 TableName: this.tableName,
@@ -104,7 +104,7 @@ export class DynamoDBClient {
      * Extends the lease timeout to prevent other instances from claiming it.
      * Should be called periodically to maintain ownership.
      */
-    async renewLease(shardId: string, instanceId: string): Promise<boolean> {
+    public async renewLease(shardId: string, instanceId: string): Promise<boolean> {
         try {
             const command = new UpdateCommand({
                 TableName: this.tableName,
@@ -130,7 +130,7 @@ export class DynamoDBClient {
     /**
      * Releases a lease for a shard that this instance owns
      */
-    async releaseLease(shardId: string, instanceId: string): Promise<boolean> {
+    public async releaseLease(shardId: string, instanceId: string): Promise<boolean> {
         try {
             const command = new UpdateCommand({
                 TableName: this.tableName,
@@ -158,7 +158,7 @@ export class DynamoDBClient {
      *
      * Useful for diagnostics and monitoring the distribution of shards across consumer instances.
      */
-    async listAllLeases(): Promise<ShardLease[]> {
+    public async listAllLeases(): Promise<ShardLease[]> {
         const command = new ScanCommand({
             TableName: this.tableName
         });
@@ -170,7 +170,7 @@ export class DynamoDBClient {
     /**
      * Gets all leases owned by a specific instance
      */
-    async getLeasesByOwner(instanceId: string): Promise<ShardLease[]> {
+    public async getLeasesByOwner(instanceId: string): Promise<ShardLease[]> {
         // Note: In production, you might want to add a GSI for leaseOwner
         // For a small number of shards, a full scan with client-side filtering is fine
         const allLeases = await this.listAllLeases();
@@ -180,7 +180,7 @@ export class DynamoDBClient {
     /**
      * Creates a new shard lease entry if it doesn't exist
      */
-    async createLeaseIfNotExists(shardId: string): Promise<boolean> {
+    public async createLeaseIfNotExists(shardId: string): Promise<boolean> {
         try {
             const command = new PutCommand({
                 TableName: this.tableName,
