@@ -29,7 +29,7 @@ export class StreamConsumer {
     }
 
     /**
-     * TODO
+     * Read telemetry data from the stream
      */
     public async readTelemetry() {
         // Find the shard iterators owned by this instance
