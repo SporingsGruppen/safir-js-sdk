@@ -47,11 +47,15 @@ export class StreamConsumer {
         );
 
         // Wait for all read operations to complete and combine results
-        const shardResults = await Promise.all(readPromises);
+        const shardResults = (await Promise.all(readPromises)).flat();
 
-        // Flatten results from all shards
-        // TODO: Add better return type for this
-        return shardResults.flat();
+        // Return transformed results from all shards
+        return shardResults.map(record => ({
+            sequenceNumber: record.SequenceNumber,
+            approximateArrivalTimestamp: record.ApproximateArrivalTimestamp,
+            data: JSON.parse(new TextDecoder().decode(record.Data)),
+            partitionKey: record.PartitionKey,
+        }));
     }
 
     /**
