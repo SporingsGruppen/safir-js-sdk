@@ -1,4 +1,4 @@
-import { ShardIteratorType } from "@aws-sdk/client-kinesis";
+import { _Record, ShardIteratorType } from "@aws-sdk/client-kinesis";
 import { v4 as uuidv4 } from 'uuid';
 import { DynamoDBClient } from "./dynamo-db";
 import { KinesisClient } from "./kinesis";
@@ -41,21 +41,17 @@ export class StreamConsumer {
         }
 
         // Fetch records from each shard
-        // TODO: Add real type for this
-        const allRecords: any[] = [];
-        const readPromises: Promise<void>[] = [];
         const recordsPerShard = Math.ceil(this.config.maxRecordsPerFetch / shardIterators.size);
+        const readPromises = Array.from(shardIterators.entries()).map(
+            ([shardId, iterator]) => this.readFromShard(shardId, iterator, recordsPerShard)
+        );
 
-        // Read records from all shards
-        for (const [shardId, iterator] of shardIterators.entries()) {
-            const promise = this.readFromShard(shardId, iterator, recordsPerShard, allRecords);
-            readPromises.push(promise);
-        }
+        // Wait for all read operations to complete and combine results
+        const shardResults = await Promise.all(readPromises);
 
-        // Wait for all read operations to complete
-        await Promise.all(readPromises);
-
-        return allRecords;
+        // Flatten results from all shards
+        // TODO: Add better return type for this
+        return shardResults.flat();
     }
 
     /**
@@ -86,8 +82,7 @@ export class StreamConsumer {
         shardId: string,
         iterator: string,
         limit: number,
-        allRecords: any[]
-    ): Promise<void> {
+    ): Promise<_Record[]> {
         try {
             const response = await this.kinesisClient.getRecords(iterator, limit);
 
@@ -104,8 +99,6 @@ export class StreamConsumer {
 
             // Process and add records
             if (response.Records && response.Records.length > 0) {
-                allRecords.push(...response.Records);
-
                 // Update checkpoint
                 const lastRecord = response.Records[response.Records.length - 1];
 
@@ -127,7 +120,10 @@ export class StreamConsumer {
                     );
                 }
 
+                return response.Records;
             }
+
+            return [];
         } catch (error) {
             console.error(`Error reading from shard ${shardId}:`, error);
 
@@ -141,6 +137,8 @@ export class StreamConsumer {
                     lastProcessedTime: Date.now(),
                 });
             }
+
+            return [];
         }
     }
 
