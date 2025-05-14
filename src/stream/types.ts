@@ -13,8 +13,14 @@ export interface StreamProducerConfig {
 }
 
 export interface StreamConsumerConfig {
-    // The duration of the lease in milliseconds (default: 300000)
-    leaseDuration: number;
+    // The duration of the lease in milliseconds (default: 30000)
+    leaseDuration?: number;
+    // Maximum number of records to fetch in each GetRecords call (default: 1000)
+    maxRecordsPerFetch?: number;
+    // A unique name for the group of the consumer instances that should share the same shards
+    groupName: string;
+    // The number of allowed shards handled by a single instance (default: 5)
+    maxShardsPerInstance?: number;
 }
 
 export interface ShardLease {
@@ -28,4 +34,19 @@ export interface ShardLease {
     checkpoint?: string;
     // Timestamp of the last checkpoint update (milliseconds since epoch)
     lastUpdated?: number;
+}
+
+/**
+ * Internal state for shard processors
+ * @internal
+ */
+export interface ShardState {
+    // The shard ID being processed
+    shardId: string;
+    // Current shard iterator for the GetRecords calls
+    iterator?: string;
+    // Last successfully processed sequence number
+    lastSequenceNumber?: string;
+    // Last successfully processed timestamp
+    lastProcessedTime?: number;
 }

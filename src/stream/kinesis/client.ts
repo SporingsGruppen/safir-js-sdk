@@ -1,4 +1,11 @@
-import { KinesisClient as AWSKinesisClient, } from "@aws-sdk/client-kinesis";
+import {
+    GetRecordsCommand,
+    GetShardIteratorCommand,
+    GetShardIteratorCommandInput,
+    KinesisClient as AWSKinesisClient,
+    ListShardsCommand,
+    ShardIteratorType,
+} from "@aws-sdk/client-kinesis";
 
 export class KinesisClient {
     private readonly client: AWSKinesisClient;
@@ -16,6 +23,34 @@ export class KinesisClient {
         });
 
         this.streamArn = process.env.AWS_KINESIS_STREAM_ARN!;
+    }
+
+    public async getAllShards(): Promise<string[]> {
+        const response = await this.client.send(new ListShardsCommand({
+            StreamARN: this.streamArn,
+        }));
+        return (response.Shards || []).map(shard => shard.ShardId!);
+    }
+
+    public async getRecords(iterator: string, limit: number) {
+        const command = new GetRecordsCommand({
+            ShardIterator: iterator,
+            Limit: limit
+        });
+
+        return this.client.send(command);
+    }
+
+    public async getIterator(shardId: string, iteratorType: ShardIteratorType, checkpoint: string | undefined) {
+        const input: GetShardIteratorCommandInput = {
+            ShardId: shardId,
+            ShardIteratorType: iteratorType,
+            StreamARN: this.streamArn,
+            StartingSequenceNumber: checkpoint,
+        };
+        const command = new GetShardIteratorCommand(input);
+
+        return this.client.send(command);
     }
 
     /**
