@@ -29,6 +29,16 @@ export class StreamConsumer {
     }
 
     /**
+     * Gets the instance ID of this consumer instance
+     *
+     * This is a unique identifier for the consumer instance.
+     * It is used to identify the instance when reading from the stream.
+     */
+    public getInstanceId(): string {
+        return this.instanceId;
+    }
+
+    /**
      * Read telemetry data from the stream
      */
     public async readTelemetry() {
