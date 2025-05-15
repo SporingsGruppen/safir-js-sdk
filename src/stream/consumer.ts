@@ -22,7 +22,7 @@ export class StreamConsumer {
             maxShardsPerInstance: config?.maxShardsPerInstance ?? 5,
         }
         // Create a unique instance ID combining the group name and a random suffix
-        this.instanceId = `${this.config.groupName}-${uuidv4().substring(0, 8)}`;
+        this.instanceId = uuidv4();
         // Initialize clients
         this.kinesisClient = new KinesisClient();
         this.dynamoDbClient = new DynamoDBClient(this.config.leaseDuration);
@@ -62,21 +62,21 @@ export class StreamConsumer {
      * Get information about all leases in the consumer group
      */
     public async getLeaseInformation(): Promise<ShardLease[]> {
-        return this.dynamoDbClient.listAllLeases();
+        return this.dynamoDbClient.listAllLeases(this.config.groupName);
     }
 
     /**
      * Get information about leases owned by this consumer instance
      */
     public async getOwnedLeases(): Promise<ShardLease[]> {
-        return this.dynamoDbClient.getLeasesByOwner(this.instanceId);
+        return this.dynamoDbClient.getLeasesByOwner(this.config.groupName, this.instanceId);
     }
 
     /**
      * Get information about shards handled by this instance
      */
     public getShardState(): ShardState[] {
-        return [...this.shardState.values()];
+        return Array.from(this.shardState.values());
     }
 
     /**
@@ -118,6 +118,7 @@ export class StreamConsumer {
                 if (lastRecord.SequenceNumber) {
                     // Checkpoint in DynamoDB
                     await this.dynamoDbClient.updateCheckpoint(
+                        this.config.groupName,
                         shardId,
                         lastRecord.SequenceNumber,
                         this.instanceId
@@ -182,13 +183,13 @@ export class StreamConsumer {
 
             // 2. Ensure all shards have lease entries in DynamoDB
             for (const shardId of shards) {
-                await this.dynamoDbClient.createLeaseIfNotExists(shardId);
+                await this.dynamoDbClient.createLeaseIfNotExists(this.config.groupName, shardId);
             }
 
             // 3. Renew leases for shards we already own
             const currentShardIds = Array.from(this.shardState.keys());
             for (const shardId of currentShardIds) {
-                const renewed = await this.dynamoDbClient.renewLease(shardId, this.instanceId);
+                const renewed = await this.dynamoDbClient.renewLease(this.config.groupName, shardId, this.instanceId);
                 if (!renewed) {
                     // We lost the lease, remove from our state
                     this.shardState.delete(shardId);
@@ -210,7 +211,11 @@ export class StreamConsumer {
                     }
 
                     // Try to acquire the lease
-                    const acquired = await this.dynamoDbClient.tryAcquireLease(shardId, this.instanceId);
+                    const acquired = await this.dynamoDbClient.tryAcquireLease(
+                        this.config.groupName,
+                        shardId,
+                        this.instanceId,
+                    );
                     if (acquired) {
                         // Initialize iterator for new shard
                         await this.initializeIteratorForShard(shardId);
@@ -228,7 +233,7 @@ export class StreamConsumer {
      */
     private async initializeIteratorForShard(shardId: string): Promise<void> {
         // Get the checkpoint if it exists
-        const lease = await this.dynamoDbClient.getLease(shardId);
+        const lease = await this.dynamoDbClient.getLease(this.config.groupName, shardId);
 
         // Get iterator
         const iteratorType = lease?.checkpoint

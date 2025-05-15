@@ -1,5 +1,5 @@
 import { DynamoDBClient as AWSDynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand, UpdateCommand, } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, UpdateCommand, } from '@aws-sdk/lib-dynamodb';
 import { ShardLease } from "../types";
 
 export class DynamoDBClient {
@@ -26,10 +26,13 @@ export class DynamoDBClient {
     /**
      * Retrieves lease information for a specific shard
      */
-    public async getLease(shardId: string): Promise<ShardLease | undefined> {
+    public async getLease(consumerGroupName: string, shardId: string): Promise<ShardLease | undefined> {
         const command = new GetCommand({
             TableName: this.tableName,
-            Key: { shardId }
+            Key: {
+                consumerGroupName,
+                shardId,
+            },
         });
 
         const response = await this.documentClient.send(command);
@@ -42,12 +45,12 @@ export class DynamoDBClient {
      * Uses a conditional update to ensure only one instance can own the lease.
      * It will succeed if the lease doesn't exist or if the existing lease has expired.
      */
-    public async tryAcquireLease(shardId: string, instanceId: string): Promise<boolean> {
+    public async tryAcquireLease(consumerGroupName: string, shardId: string, instanceId: string): Promise<boolean> {
         try {
             const now = Date.now();
             const command = new UpdateCommand({
                 TableName: this.tableName,
-                Key: { shardId },
+                Key: { consumerGroupName, shardId },
                 UpdateExpression: 'SET leaseOwner = :owner, leaseTimeout = :timeout, lastUpdated = :now',
                 ConditionExpression: 'attribute_not_exists(leaseOwner) OR leaseTimeout < :now',
                 ExpressionAttributeValues: {
@@ -74,11 +77,11 @@ export class DynamoDBClient {
      * The checkpoint represents the last successfully processed record position.
      * The update will fail if this instance no longer owns the lease.
      */
-    public async updateCheckpoint(shardId: string, sequenceNumber: string, instanceId: string): Promise<boolean> {
+    public async updateCheckpoint(consumerGroupName: string, shardId: string, sequenceNumber: string, instanceId: string): Promise<boolean> {
         try {
             const command = new UpdateCommand({
                 TableName: this.tableName,
-                Key: { shardId },
+                Key: { consumerGroupName, shardId },
                 UpdateExpression: 'SET checkpoint = :checkpoint, lastUpdated = :now',
                 ConditionExpression: 'leaseOwner = :instanceId',
                 ExpressionAttributeValues: {
@@ -104,11 +107,11 @@ export class DynamoDBClient {
      * Extends the lease timeout to prevent other instances from claiming it.
      * Should be called periodically to maintain ownership.
      */
-    public async renewLease(shardId: string, instanceId: string): Promise<boolean> {
+    public async renewLease(consumerGroupName: string, shardId: string, instanceId: string): Promise<boolean> {
         try {
             const command = new UpdateCommand({
                 TableName: this.tableName,
-                Key: { shardId },
+                Key: { consumerGroupName, shardId },
                 UpdateExpression: 'SET leaseTimeout = :timeout',
                 ConditionExpression: 'leaseOwner = :instanceId',
                 ExpressionAttributeValues: {
@@ -128,39 +131,17 @@ export class DynamoDBClient {
     }
 
     /**
-     * Releases a lease for a shard that this instance owns
-     */
-    public async releaseLease(shardId: string, instanceId: string): Promise<boolean> {
-        try {
-            const command = new UpdateCommand({
-                TableName: this.tableName,
-                Key: { shardId },
-                UpdateExpression: 'REMOVE leaseOwner SET leaseTimeout = :now',
-                ConditionExpression: 'leaseOwner = :instanceId',
-                ExpressionAttributeValues: {
-                    ':now': Date.now(),
-                    ':instanceId': instanceId
-                }
-            });
-
-            await this.documentClient.send(command);
-            return true;
-        } catch (error: any) {
-            if (error.name === 'ConditionalCheckFailedException') {
-                return false;
-            }
-            throw error;
-        }
-    }
-
-    /**
      * Lists all leases in the system
      *
      * Useful for diagnostics and monitoring the distribution of shards across consumer instances.
      */
-    public async listAllLeases(): Promise<ShardLease[]> {
-        const command = new ScanCommand({
-            TableName: this.tableName
+    public async listAllLeases(consumerGroupName: string): Promise<ShardLease[]> {
+        const command = new QueryCommand({
+            TableName: this.tableName,
+            KeyConditionExpression: 'consumerGroupName = :groupName',
+            ExpressionAttributeValues: {
+                ':groupName': consumerGroupName
+            }
         });
 
         const response = await this.documentClient.send(command);
@@ -170,25 +151,26 @@ export class DynamoDBClient {
     /**
      * Gets all leases owned by a specific instance
      */
-    public async getLeasesByOwner(instanceId: string): Promise<ShardLease[]> {
+    public async getLeasesByOwner(consumerGroupName: string, instanceId: string): Promise<ShardLease[]> {
         // Note: In production, you might want to add a GSI for leaseOwner
         // For a small number of shards, a full scan with client-side filtering is fine
-        const allLeases = await this.listAllLeases();
-        return allLeases.filter(lease => lease.leaseOwner === instanceId);
+        const allGroupLeases = await this.listAllLeases(consumerGroupName);
+        return allGroupLeases.filter(lease => lease.leaseOwner === instanceId);
     }
 
     /**
      * Creates a new shard lease entry if it doesn't exist
      */
-    public async createLeaseIfNotExists(shardId: string): Promise<boolean> {
+    public async createLeaseIfNotExists(consumerGroupName: string, shardId: string): Promise<boolean> {
         try {
             const command = new PutCommand({
                 TableName: this.tableName,
                 Item: {
+                    consumerGroupName,
                     shardId,
                     lastUpdated: Date.now()
                 },
-                ConditionExpression: 'attribute_not_exists(shardId)'
+                ConditionExpression: 'attribute_not_exists(consumerGroupName)'
             });
 
             await this.documentClient.send(command);
