@@ -74,6 +74,50 @@ await producer.writeTelemetry([
 ]);
 ```
 
+### StreamConsumer
+
+The `StreamConsumer` class handles reading telemetry data from the stream.
+
+```typescript
+import { StreamConsumer } from '@sporings-gruppen/safir-js-sdk';
+
+const producer = new StreamConsumer({
+    groupName: "telemetry-processor",
+    leaseDuration: 30000,
+    maxRecordsPerFetch: 1000,
+    maxShardsPerInstance: 5,
+});
+```
+
+#### Configuration Options
+
+| Option                 | Type   | Required | Default | Description                                                           |
+|------------------------|--------|----------|---------|-----------------------------------------------------------------------|
+| `groupName`            | string | Yes      | -       | The name of the group of instances that should share available shards |
+| `leaseDuration`        | number | No       | 30000   | Lifetime of a lease in milliseconds                                   |
+| `maxRecordsPerFetch`   | number | No       | 1000    | Total number of records for a single execution                        |
+| `maxShardsPerInstance` | number | No       | 5       | Number of shards a single instance is allowed to own from a stream    |
+
+#### Environment Variables
+
+The following environment variables must be set to use the functionality:
+
+- `AWS_ACCESS_KEY_ID`: AWS access key ID
+- `AWS_SECRET_ACCESS_KEY`: AWS secret access key
+- `AWS_KINESIS_STREAM_ARN`: ARN of the Kinesis stream
+- `AWS_DYNAMO_DB_TABLE_NAME`: Name of the lease table in DynamoDB
+- `AWS_REGION`: AWS region (optional)
+
+#### Methods
+
+##### `readTelemetry(): Promise<Record[]>`
+
+Read telemetry packets from the stream.
+
+```typescript
+const records = await consumer.readTelemetry();
+```
+
 ## Error Handling
 
 The SDK implements automatic retries with exponential backoff for failed operations.

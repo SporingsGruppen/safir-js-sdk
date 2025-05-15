@@ -18,7 +18,7 @@ export class StreamProducer {
     /**
      * Writes a single telemetry packet to the stream
      */
-    async writeTelemetry(packets: StreamTelemetryPacket[]): Promise<void> {
+    public async writeTelemetry(packets: StreamTelemetryPacket[]): Promise<void> {
         const records = packets.map(packet => ({
             Data: this.serializePacketTelemetry(packet),
             PartitionKey: this.generatePartitionKey(packet)
