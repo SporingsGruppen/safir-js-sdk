@@ -4,7 +4,6 @@ import { DynamoDBClient } from "./dynamo-db";
 import { KinesisClient } from "./kinesis";
 import { ShardLease, ShardState, StreamConsumerConfig } from "./types";
 
-// TODO: Add documentation for this class in README
 export class StreamConsumer {
     private readonly kinesisClient: KinesisClient;
     private readonly dynamoDbClient: DynamoDBClient;
