@@ -5,6 +5,13 @@ export type StreamTelemetryPacket = {
     telemetry: Telemetry;
 }
 
+export type StreamTelemetryRecord = {
+    sequenceNumber: string | undefined;
+    approximateArrivalTimestamp: Date | undefined;
+    data: Telemetry;
+    partitionKey: string | undefined;
+}
+
 export interface StreamProducerConfig {
     // The number of retries on error (default: 3)
     maxRetries?: number;

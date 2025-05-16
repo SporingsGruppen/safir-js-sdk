@@ -2,7 +2,7 @@ import { _Record, ShardIteratorType } from "@aws-sdk/client-kinesis";
 import { v4 as uuidv4 } from 'uuid';
 import { DynamoDBClient } from "./dynamo-db";
 import { KinesisClient } from "./kinesis";
-import { ShardLease, ShardState, StreamConsumerConfig } from "./types";
+import { ShardLease, ShardState, StreamConsumerConfig, StreamTelemetryRecord } from "./types";
 
 export class StreamConsumer {
     private readonly kinesisClient: KinesisClient;
@@ -40,7 +40,7 @@ export class StreamConsumer {
     /**
      * Read telemetry data from the stream
      */
-    public async readTelemetry() {
+    public async readTelemetry(): Promise<StreamTelemetryRecord[]> {
         // Find the shard iterators owned by this instance
         const shardIterators = await this.getOwnedShardIterators();
 
