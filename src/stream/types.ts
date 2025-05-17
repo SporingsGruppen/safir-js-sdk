@@ -1,3 +1,4 @@
+import { _Record, ChildShard } from "@aws-sdk/client-kinesis";
 import { Telemetry } from "../types";
 
 export type StreamTelemetryPacket = {
@@ -56,4 +57,31 @@ export interface ShardState {
     lastSequenceNumber?: string;
     // Last successfully processed timestamp
     lastProcessedTime?: number;
+}
+
+export interface ShardResponse {
+    // The id of the shard
+    shardId: string;
+    // The actual records from the response
+    records: _Record[];
+    // The iterator for reading the next records
+    nextIterator?: string;
+    // Number of milliseconds between this response and the latest data in the shard
+    readDelay?: number;
+    // Optional list of child shards
+    childShards?: ChildShard[];
+    // Optional error object in case the read of the shard went wrong
+    error?: {
+        message: string;
+        original?: unknown;
+    },
+}
+
+export interface ReadStreamTelemetryMetadata extends Omit<ShardResponse, "records"> {
+    shardId: string;
+}
+
+export interface ReadStreamTelemetryResponse {
+    records: StreamTelemetryRecord[];
+    metadata: ReadStreamTelemetryMetadata[];
 }
