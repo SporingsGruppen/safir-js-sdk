@@ -1,8 +1,16 @@
-import { _Record, ShardIteratorType } from "@aws-sdk/client-kinesis";
+import { ShardIteratorType } from "@aws-sdk/client-kinesis";
 import { v4 as uuidv4 } from 'uuid';
 import { DynamoDBClient } from "./dynamo-db";
 import { KinesisClient } from "./kinesis";
-import { ShardLease, ShardState, StreamConsumerConfig, StreamTelemetryRecord } from "./types";
+import {
+    ReadStreamTelemetryMetadata,
+    ReadStreamTelemetryResponse,
+    ShardLease,
+    ShardResponse,
+    ShardState,
+    StreamConsumerConfig,
+    StreamTelemetryRecord
+} from "./types";
 
 export class StreamConsumer {
     private readonly kinesisClient: KinesisClient;
@@ -40,13 +48,16 @@ export class StreamConsumer {
     /**
      * Read telemetry data from the stream
      */
-    public async readTelemetry(): Promise<StreamTelemetryRecord[]> {
+    public async readTelemetry(): Promise<ReadStreamTelemetryResponse> {
         // Find the shard iterators owned by this instance
         const shardIterators = await this.getOwnedShardIterators();
 
         // No shards owned by this instance
         if (shardIterators.size === 0) {
-            return [];
+            return {
+                metadata: [],
+                records: [],
+            };
         }
 
         // Fetch records from each shard
@@ -56,15 +67,25 @@ export class StreamConsumer {
         );
 
         // Wait for all read operations to complete and combine results
-        const shardResults = (await Promise.all(readPromises)).flat();
+        const shardResults = await Promise.all(readPromises);
+        const metadata: ReadStreamTelemetryMetadata[] = [];
+        const records: StreamTelemetryRecord[] = [];
+
+        for (const { records: shardRecords, ...meta } of shardResults) {
+            records.push(...shardRecords.map(record => ({
+                sequenceNumber: record.SequenceNumber,
+                approximateArrivalTimestamp: record.ApproximateArrivalTimestamp,
+                data: JSON.parse(new TextDecoder().decode(record.Data)),
+                partitionKey: record.PartitionKey,
+            })));
+            metadata.push(meta);
+        }
 
         // Return transformed results from all shards
-        return shardResults.map(record => ({
-            sequenceNumber: record.SequenceNumber,
-            approximateArrivalTimestamp: record.ApproximateArrivalTimestamp,
-            data: JSON.parse(new TextDecoder().decode(record.Data)),
-            partitionKey: record.PartitionKey,
-        }));
+        return {
+            metadata,
+            records,
+        }
     }
 
     /**
@@ -95,7 +116,7 @@ export class StreamConsumer {
         shardId: string,
         iterator: string,
         limit: number,
-    ): Promise<_Record[]> {
+    ): Promise<ShardResponse> {
         try {
             const response = await this.kinesisClient.getRecords(iterator, limit);
 
@@ -134,13 +155,17 @@ export class StreamConsumer {
                     );
                 }
 
-                return response.Records;
+                return {
+                    shardId,
+                    records: response.Records,
+                    nextIterator: response.NextShardIterator,
+                    readDelay: response.MillisBehindLatest,
+                    childShards: response.ChildShards,
+                };
             }
 
-            return [];
+            return { shardId, records: [] };
         } catch (error) {
-            console.error(`Error reading from shard ${shardId}:`, error);
-
             // Remove invalid iterator
             const state = this.shardState.get(shardId);
 
@@ -152,7 +177,14 @@ export class StreamConsumer {
                 });
             }
 
-            return [];
+            return {
+                shardId,
+                error: {
+                    message: `Error reading from shard ${shardId}`,
+                    original: error,
+                },
+                records: []
+            };
         }
     }
 
