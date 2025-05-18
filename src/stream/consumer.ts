@@ -167,15 +167,7 @@ export class StreamConsumer {
             return { shardId, records: [] };
         } catch (error) {
             // Remove invalid iterator
-            const state = this.shardState.get(shardId);
-
-            if (state) {
-                this.shardState.set(shardId, {
-                    ...state,
-                    iterator: undefined,
-                    lastProcessedTime: Date.now(),
-                });
-            }
+            this.shardState.delete(shardId);
 
             return {
                 shardId,
