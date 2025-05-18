@@ -1,6 +1,6 @@
 {
   "name": "@sporings-gruppen/safir-js-sdk",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "A JavaScript SDK for interacting with the SAFIR product",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
